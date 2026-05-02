@@ -53,7 +53,10 @@ class Config:
         self._data = data
 
     def init(self) -> dict[str, Any]:
-        """初始化默认配置."""
+        """初始化默认配置 (不覆盖已有配置)."""
+        if self.config_path.exists():
+            self.load()
+            return self._data
         cfg = {**DEFAULT_CONFIG, "project": self.project_dir.name}
         self.save(cfg)
         return cfg

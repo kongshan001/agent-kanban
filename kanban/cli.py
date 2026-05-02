@@ -305,6 +305,37 @@ def task_reject(
         _fail(str(e))
 
 
+@task_app.command(name="reset")
+def task_reset(
+    task_id: str = typer.Argument(help="任务ID"),
+    force: bool = typer.Option(False, "--force", "-f", help="强制清理 worktree 和分支"),
+) -> None:
+    """重置任务到 DRAFT 状态，清理 worktree."""
+    board = _board()
+    try:
+        task = board.get_task(task_id)
+        # 清理 worktree
+        if task.worktree_path and force:
+            try:
+                wm = WorktreeManager(board.data.repo_path, board.data.main_branch)
+                wm.remove_worktree(task)
+                console.print(f"[green]✅ 已清理 worktree[/green]")
+            except WorktreeError as e:
+                console.print(f"[yellow]⚠️ Worktree 清理失败: {e}[/yellow]")
+        # 重置状态
+        task.status = TaskStatus.DRAFT
+        task.phase = Phase.PLAN
+        task.iteration = 1
+        task.evaluation_results = []
+        task.scores = {}
+        task.worktree_path = ""
+        task.branch = ""
+        board.save()
+        console.print(f"[green]✅ 任务已重置[/green]: {task.id} → DRAFT")
+    except BoardError as e:
+        _fail(str(e))
+
+
 @task_app.command(name="auto")
 def task_auto(
     task_id: str = typer.Argument(help="任务ID"),
