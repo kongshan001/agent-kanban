@@ -309,6 +309,7 @@ def task_reject(
 def task_auto(
     task_id: str = typer.Argument(help="任务ID"),
     single_eval: bool = typer.Option(True, "--single-eval/--multi-eval", help="评估使用单次调用"),
+    run_agent: bool = typer.Option(False, "--run-agent", "-r", help="缺失文档时自动调用Agent补充"),
 ) -> None:
     """一键推进任务: 从当前阶段自动推进到需要用户介入的节点."""
     board = _board()
@@ -320,6 +321,22 @@ def task_auto(
     config = Config()
     config.load()
     evaluator = Evaluator(config)
+
+    def _try_agent_fill(task, phase: Phase) -> bool:
+        """尝试用 agent 补充缺失文档，返回是否成功."""
+        if not run_agent or not task.assignee:
+            return False
+        agents = config.get_agents()
+        if task.assignee not in agents:
+            return False
+        console.print(f"[cyan]⏳ 调用 Agent ({task.assignee}) 补充 {phase.value} 阶段产出...[/cyan]")
+        try:
+            runner = AgentRunner(config)
+            runner.run_phase(task, phase, agents[task.assignee])
+            return True
+        except Exception as e:
+            console.print(f"[yellow]⚠️ Agent 执行失败: {e}[/yellow]")
+            return False
 
     while True:
         task = board.get_task(task_id)
@@ -334,18 +351,24 @@ def task_auto(
         elif task.status == TaskStatus.PLANNING:
             errors = PhaseGuard.check(task, TaskStatus.EXECUTING)
             if errors:
-                console.print(f"[yellow]⚠️ 规划未完成, 缺失: {', '.join(errors)}[/yellow]")
-                console.print("[dim]请手动完成规划后再次执行 kanban task auto[/dim]")
-                break
+                if _try_agent_fill(task, Phase.PLAN):
+                    errors = PhaseGuard.check(task, TaskStatus.EXECUTING)
+                if errors:
+                    console.print(f"[yellow]⚠️ 规划未完成, 缺失: {', '.join(errors)}[/yellow]")
+                    console.print("[dim]请手动完成规划后再次执行 kanban task auto[/dim]")
+                    break
             board.transition(task_id, TaskStatus.EXECUTING)
             console.print("[green]→ 规划完成, 进入执行[/green]")
 
         elif task.status == TaskStatus.EXECUTING:
             errors = PhaseGuard.check(task, TaskStatus.EVALUATING)
             if errors:
-                console.print(f"[yellow]⚠️ 执行未完成, 缺失: {', '.join(errors)}[/yellow]")
-                console.print("[dim]请手动完成执行后再次执行 kanban task auto[/dim]")
-                break
+                if _try_agent_fill(task, Phase.EXECUTE):
+                    errors = PhaseGuard.check(task, TaskStatus.EVALUATING)
+                if errors:
+                    console.print(f"[yellow]⚠️ 执行未完成, 缺失: {', '.join(errors)}[/yellow]")
+                    console.print("[dim]请手动完成执行后再次执行 kanban task auto[/dim]")
+                    break
             board.transition(task_id, TaskStatus.EVALUATING)
             console.print("[green]→ 执行完成, 进入评估[/green]")
 
