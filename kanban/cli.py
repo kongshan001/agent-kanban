@@ -218,7 +218,10 @@ def task_exec_done(task_id: str = typer.Argument(help="任务ID")) -> None:
 
 
 @task_app.command(name="evaluate")
-def task_evaluate(task_id: str = typer.Argument(help="任务ID")) -> None:
+def task_evaluate(
+    task_id: str = typer.Argument(help="任务ID"),
+    single: bool = typer.Option(False, "--single", "-s", help="使用单次综合评估（1次LLM调用代替4次）"),
+) -> None:
     """运行评估流程."""
     board = _board()
     try:
@@ -228,7 +231,12 @@ def task_evaluate(task_id: str = typer.Argument(help="任务ID")) -> None:
         config = Config()
         config.load()
         evaluator = Evaluator(config)
-        results = evaluator.evaluate(task)
+
+        if single:
+            console.print("[cyan]使用单次综合评估模式[/cyan]")
+            results = evaluator.evaluate_single(task)
+        else:
+            results = evaluator.evaluate(task)
         board.save()
 
         all_passed = evaluator.check_all_passed(task)
@@ -295,6 +303,90 @@ def task_reject(
             console.print(f"[yellow]⚠️ 任务已拒绝, 回到规划阶段[/yellow]: {task.id}")
     except BoardError as e:
         _fail(str(e))
+
+
+@task_app.command(name="auto")
+def task_auto(
+    task_id: str = typer.Argument(help="任务ID"),
+    single_eval: bool = typer.Option(True, "--single-eval/--multi-eval", help="评估使用单次调用"),
+) -> None:
+    """一键推进任务: 从当前阶段自动推进到需要用户介入的节点."""
+    board = _board()
+    try:
+        task = board.get_task(task_id)
+    except BoardError as e:
+        _fail(str(e))
+
+    config = Config()
+    config.load()
+    evaluator = Evaluator(config)
+
+    while True:
+        task = board.get_task(task_id)
+        console.print(f"\n[cyan]当前状态: {task.status.value} | 阶段: {task.phase.value} | 迭代: {task.iteration}[/cyan]")
+
+        if task.status == TaskStatus.DRAFT:
+            wm = WorktreeManager(board.data.repo_path, board.data.main_branch)
+            wm.create_worktree(task)
+            board.transition(task_id, TaskStatus.PLANNING)
+            console.print("[green]→ 创建 worktree, 进入规划[/green]")
+
+        elif task.status == TaskStatus.PLANNING:
+            errors = PhaseGuard.check(task, TaskStatus.EXECUTING)
+            if errors:
+                console.print(f"[yellow]⚠️ 规划未完成, 缺失: {', '.join(errors)}[/yellow]")
+                console.print("[dim]请手动完成规划后再次执行 kanban task auto[/dim]")
+                break
+            board.transition(task_id, TaskStatus.EXECUTING)
+            console.print("[green]→ 规划完成, 进入执行[/green]")
+
+        elif task.status == TaskStatus.EXECUTING:
+            errors = PhaseGuard.check(task, TaskStatus.EVALUATING)
+            if errors:
+                console.print(f"[yellow]⚠️ 执行未完成, 缺失: {', '.join(errors)}[/yellow]")
+                console.print("[dim]请手动完成执行后再次执行 kanban task auto[/dim]")
+                break
+            board.transition(task_id, TaskStatus.EVALUATING)
+            console.print("[green]→ 执行完成, 进入评估[/green]")
+
+        elif task.status == TaskStatus.EVALUATING:
+            console.print("[cyan]⏳ 运行评估...[/cyan]")
+            if single_eval:
+                results = evaluator.evaluate_single(task)
+            else:
+                results = evaluator.evaluate(task)
+            board.save()
+
+            all_passed = evaluator.check_all_passed(task)
+            if all_passed:
+                board.transition(task_id, TaskStatus.USER_REVIEW)
+                console.print(f"[green]✅ 评估全部通过, 进入用户审核[/green]")
+                console.print("[dim]请执行 kanban task approve 或 kanban task reject[/dim]")
+                break
+            else:
+                failing = [r.role for r in task.evaluation_results if r.score < 9.0]
+                console.print(f"[yellow]⚠️ 评估未通过: {', '.join(failing)}[/yellow]")
+                max_iter = config.get_max_iterations()
+                if task.iteration < max_iter:
+                    task.iteration += 1
+                    board.transition(task_id, TaskStatus.SELF_IMPROVE)
+                    board.transition(task_id, TaskStatus.EXECUTING)
+                    console.print(f"[yellow]→ 进入自迭代第 {task.iteration} 轮[/yellow]")
+                    console.print("[dim]请根据评估反馈改进后再次执行 kanban task auto[/dim]")
+                    break
+                else:
+                    board.transition(task_id, TaskStatus.USER_REVIEW)
+                    console.print(f"[red]已达迭代上限, 进入用户审核[/red]")
+                    break
+
+        elif task.status in (TaskStatus.USER_REVIEW, TaskStatus.MERGED, TaskStatus.ARCHIVED):
+            console.print(f"[dim]任务处于 {task.status.value} 状态, 需要用户操作[/dim]")
+            break
+        else:
+            console.print(f"[dim]任务处于 {task.status.value} 状态, 无需自动推进[/dim]")
+            break
+
+    console.print(f"\n[cyan]最终状态: {task.status.value}[/cyan]")
 
 
 # ── Git 操作 ──
