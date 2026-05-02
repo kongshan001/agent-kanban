@@ -1,0 +1,19 @@
+agents:
+  dev1:
+    capabilities:
+    - develop
+    - test
+    - review
+    model: ''
+    type: hermes
+evaluation:
+  roles:
+  - tech_lead
+  - qa
+  - product
+  - design
+  score_threshold: 9.0
+main_branch: master
+project: demo-project
+self_improve:
+  max_iterations: 5

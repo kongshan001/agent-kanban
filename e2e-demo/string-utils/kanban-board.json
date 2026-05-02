@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "project": "demo-project",
+  "repo_path": "/tmp/demo-project",
+  "main_branch": "master",
+  "tasks": {
+    "TK-001": {
+      "id": "TK-001",
+      "title": "实现字符串工具函数",
+      "description": "实现 is_palindrome(s) 和 reverse_string(s) 函数，带完整测试",
+      "status": "EXECUTING",
+      "assignee": "dev1",
+      "worktree_path": "/tmp/demo-project/.worktrees/TK-001",
+      "branch": "task/TK-001",
+      "phase": "EXECUTE",
+      "iteration": 2,
+      "scores": {},
+      "created_at": "2026-05-02T17:19:05.727656",
+      "updated_at": "2026-05-02T17:23:05.179374",
+      "documents": [
+        "/tmp/demo-project/.worktrees/TK-001/docs/reviews/review-1.md"
+      ],
+      "evaluation_results": [
+        {
+          "role": "tech_lead",
+          "score": 9.0,
+          "passed": true,
+          "report_path": "/tmp/demo-project/.worktrees/TK-001/docs/reviews/review-1.md",
+          "feedback": "综合评估 - tech_lead: 9.0/10"
+        },
+        {
+          "role": "qa",
+          "score": 8.0,
+          "passed": false,
+          "report_path": "/tmp/demo-project/.worktrees/TK-001/docs/reviews/review-1.md",
+          "feedback": "综合评估 - qa: 8.0/10"
+        },
+        {
+          "role": "product",
+          "score": 9.0,
+          "passed": true,
+          "report_path": "/tmp/demo-project/.worktrees/TK-001/docs/reviews/review-1.md",
+          "feedback": "综合评估 - product: 9.0/10"
+        },
+        {
+          "role": "design",
+          "score": 10.0,
+          "passed": true,
+          "report_path": "/tmp/demo-project/.worktrees/TK-001/docs/reviews/review-1.md",
+          "feedback": "综合评估 - design: 10.0/10"
+        }
+      ],
+      "skip_checks": [
+        "test"
+      ]
+    }
+  },
+  "agents": {}
+}
