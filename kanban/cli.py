@@ -115,11 +115,15 @@ def task_create(
     title: str = typer.Option(..., "--title", "-t", help="任务标题"),
     desc: str = typer.Option("", "--desc", "-d", help="任务描述"),
     assignee: str = typer.Option("", "--assignee", "-a", help="负责人"),
+    skip_checks: str = typer.Option("", "--skip-checks", help="跳过的检查项，逗号分隔 (test,review)"),
 ) -> None:
     """创建任务."""
     board = _board()
     try:
         task = board.create_task(title=title, description=desc, assignee=assignee)
+        if skip_checks:
+            task.skip_checks = [s.strip() for s in skip_checks.split(",")]
+            board.save()
         console.print(f"[green]✅ 任务已创建[/green]: {task.id} - {task.title}")
     except BoardError as e:
         _fail(str(e))

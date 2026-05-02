@@ -93,6 +93,7 @@ class Task(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
     documents: list[str] = []
     evaluation_results: list[EvaluationResult] = []
+    skip_checks: list[str] = []  # 跳过的检查项: "test", "review" 等
 
 
 class BoardData(BaseModel):

@@ -70,14 +70,15 @@ class PhaseGuard:
         summary = docs / f"execute-summary-{task.iteration}.md"
         if not summary.exists():
             errors.append(f"缺少执行复盘: docs/execute-summary-{task.iteration}.md")
-        # 检查是否有测试文件
-        has_tests = False
-        for pattern in ["**/test_*.py", "**/*_test.py", "**/tests/**"]:
-            if list(base.glob(pattern)):
-                has_tests = True
-                break
-        if not has_tests:
-            errors.append("缺少测试代码文件")
+        # 检查是否有测试文件（除非跳过）
+        if "test" not in task.skip_checks:
+            has_tests = False
+            for pattern in ["**/test_*.py", "**/*_test.py", "**/tests/**"]:
+                if list(base.glob(pattern)):
+                    has_tests = True
+                    break
+            if not has_tests:
+                errors.append("缺少测试代码文件 (可通过 skip_checks=['test'] 跳过)")
         return errors
 
     @staticmethod
