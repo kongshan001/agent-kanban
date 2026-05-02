@@ -222,6 +222,22 @@ class Evaluator:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
 
+        # 尝试通过 hermes CLI 评估
+        try:
+            hermes_bin = "/root/.hermes/hermes-agent/venv/bin/python"
+            result = subprocess.run(
+                [hermes_bin, "-m", "hermes_cli.main", "chat", "-q", prompt, "--yolo"],
+                capture_output=True, text=True, timeout=180,
+                cwd=wt if Path(wt).exists() else None,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                # 清理 hermes TUI 输出：只保留 markdown 格式的评估内容
+                content = self._clean_hermes_output(result.stdout)
+                if content:
+                    return content
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+
         # 尝试通过 opencode
         try:
             result = subprocess.run(
@@ -295,6 +311,29 @@ LLM 评估器未连接，请手动评分。
 - 配置 LLM CLI (claude 或 opencode) 以启用自动评估
 - 或手动修改此文件填写实际评分
 """
+
+    def _clean_hermes_output(self, raw: str) -> Optional[str]:
+        """清理 hermes TUI 输出，提取 markdown 内容."""
+        import re as _re
+        # 去掉 ANSI 转义码
+        ansi_clean = _re.sub(r'\x1b\[[0-9;]*[a-zA-Z]?', '', raw)
+        # 去掉框线字符
+        box_clean = _re.sub(r'[╭╮╰╯│─┃━┏┓┗┛┠┨┣┫╋┿⠀\u2800]+', '', ansi_clean)
+        # 找到第一个 ## 标题开始的内容
+        lines = box_clean.split("\n")
+        content_lines = []
+        in_content = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("## ") or stripped.startswith("# "):
+                in_content = True
+            if in_content and stripped:
+                content_lines.append(stripped)
+        if content_lines:
+            return "\n".join(content_lines)
+        # fallback: 取最后 50 行有意义的文本
+        meaningful = [l.strip() for l in lines if l.strip() and len(l.strip()) > 10]
+        return "\n".join(meaningful[-50:]) if meaningful else None
 
     def check_all_passed(self, task: Task) -> bool:
         """检查所有评估是否通过."""

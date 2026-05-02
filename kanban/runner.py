@@ -127,9 +127,11 @@ class AgentRunner:
         return self._exec_in_worktree(wt, cmd, timeout=600)
 
     def _run_openclaw(self, task: Task, agent: AgentConfig, prompt: str) -> str:
-        """通过 openclaw sessions spawn 执行."""
-        cmd = ["openclaw", "system", "event", "--text", f"spawn: {prompt[:100]}..."]
-        return self._exec(cmd, timeout=60)
+        """通过 hermes CLI 执行 (openclaw 暂用 hermes 替代)."""
+        wt = task.worktree_path
+        hermes_bin = "/root/.hermes/hermes-agent/venv/bin/python"
+        cmd = [hermes_bin, "-m", "hermes_cli.main", "chat", "-q", prompt, "--yolo"]
+        return self._exec_in_worktree(wt, cmd, timeout=300) if wt else self._exec(cmd, timeout=300)
 
     def _exec_in_worktree(self, worktree: str, cmd: list[str], timeout: int = 600) -> str:
         """在 worktree 目录执行命令."""
@@ -156,13 +158,22 @@ class AgentRunner:
     def detect_available_agents() -> list[dict[str, str]]:
         """检测本地可用的 agent CLI."""
         agents = []
-        for name, cmd in [("claude-code", "claude"), ("opencode", "opencode")]:
+        checks = [
+            ("claude-code", "claude"),
+            ("opencode", "opencode"),
+            ("hermes", "/root/.hermes/hermes-agent/venv/bin/python"),
+        ]
+        for name, cmd in checks:
             try:
+                if cmd.startswith("/"):
+                    test_cmd = [cmd, "-m", "hermes_cli.main", "--version"]
+                else:
+                    test_cmd = ["which", cmd]
                 result = subprocess.run(
-                    ["which", cmd], capture_output=True, text=True, timeout=5,
+                    test_cmd, capture_output=True, text=True, timeout=5,
                 )
                 if result.returncode == 0:
-                    agents.append({"name": name, "cli": cmd, "path": result.stdout.strip()})
+                    agents.append({"name": name, "cli": cmd})
             except Exception:
                 pass
         return agents
