@@ -1,0 +1,29 @@
+# 任务归档总结
+
+**任务**: {{ task.id }} - {{ task.title }}
+**归档日期**: {{ date }}
+
+## 1. 任务概述
+
+{{ task.description or '无描述' }}
+
+## 2. 执行历程
+
+- 总迭代轮次: {{ task.iteration }}
+- 最终状态: {{ task.status.value }}
+
+## 3. 产出文档
+
+{% for doc in task.documents %}
+- {{ doc }}
+{% endfor %}
+
+## 4. 最终评分
+
+{% for key, value in task.scores.items() %}
+- {{ key }}: {{ value }}/10
+{% endfor %}
+
+## 5. 经验总结
+
+- 待补充
