@@ -12,7 +12,7 @@ from rich.table import Table
 from .board import Board, BoardError
 from .config import Config
 from .evaluator import Evaluator
-from .models import AgentConfig, TaskStatus
+from .models import AgentConfig, Phase, TaskStatus
 from .reporter import Reporter
 from .runner import AgentRunner
 from .workflow import GuardError, PhaseGuard

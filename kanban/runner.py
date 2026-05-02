@@ -71,8 +71,8 @@ class AgentRunner:
             return self._run_claude_code(task, agent, prompt)
         elif agent.type == "opencode":
             return self._run_opencode(task, agent, prompt)
-        elif agent.type == "openclaw":
-            return self._run_openclaw(task, agent, prompt)
+        elif agent.type in ("openclaw", "hermes"):
+            return self._run_hermes(task, agent, prompt)
         else:
             raise RunnerError(f"不支持的 agent 类型: {agent.type}")
 
@@ -83,6 +83,8 @@ class AgentRunner:
             return self._run_claude_code(task, agent, prompt)
         elif agent.type == "opencode":
             return self._run_opencode(task, agent, prompt)
+        elif agent.type in ("openclaw", "hermes"):
+            return self._run_hermes(task, agent, prompt)
         else:
             raise RunnerError(f"不支持的 agent 类型: {agent.type}")
 
@@ -126,7 +128,7 @@ class AgentRunner:
         cmd = ["opencode", "run", prompt]
         return self._exec_in_worktree(wt, cmd, timeout=600)
 
-    def _run_openclaw(self, task: Task, agent: AgentConfig, prompt: str) -> str:
+    def _run_hermes(self, task: Task, agent: AgentConfig, prompt: str) -> str:
         """通过 hermes CLI 执行 (openclaw 暂用 hermes 替代)."""
         wt = task.worktree_path
         hermes_bin = "/root/.hermes/hermes-agent/venv/bin/python"
