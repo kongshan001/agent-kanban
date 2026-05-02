@@ -38,7 +38,7 @@ VALID_TRANSITIONS: dict[TaskStatus, list[TaskStatus]] = {
     TaskStatus.EXECUTING: [TaskStatus.EVALUATING, TaskStatus.PLANNING],
     TaskStatus.EVALUATING: [TaskStatus.SELF_IMPROVE, TaskStatus.USER_REVIEW, TaskStatus.PLANNING],
     TaskStatus.SELF_IMPROVE: [TaskStatus.EXECUTING],
-    TaskStatus.USER_REVIEW: [TaskStatus.ARCHIVED, TaskStatus.PLANNING],
+    TaskStatus.USER_REVIEW: [TaskStatus.MERGED, TaskStatus.PLANNING],
     TaskStatus.MERGED: [TaskStatus.ARCHIVED],
     TaskStatus.ARCHIVED: [],
 }

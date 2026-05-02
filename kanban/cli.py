@@ -236,7 +236,7 @@ def task_evaluate(task_id: str = typer.Argument(help="任务ID")) -> None:
             board.transition(task_id, TaskStatus.USER_REVIEW)
             console.print(f"[green]✅ 评估全部通过, 进入用户审核[/green]: {task.id}")
         else:
-            failing = evaluator.get_failing_roles(task)
+            failing = [r.role for r in task.evaluation_results if r.score < 9.0]
             console.print(f"[yellow]⚠️ 部分评估未通过: {', '.join(failing)}[/yellow]")
             max_iter = config.get_max_iterations()
             if task.iteration < max_iter:
@@ -251,26 +251,48 @@ def task_evaluate(task_id: str = typer.Argument(help="任务ID")) -> None:
 
 
 @task_app.command(name="approve")
-def task_approve(task_id: str = typer.Argument(help="任务ID")) -> None:
-    """批准任务: USER_REVIEW → ARCHIVED."""
+def task_approve(
+    task_id: str = typer.Argument(help="任务ID"),
+    merge: bool = typer.Option(True, "--merge/--no-merge", help="是否自动合并到主干"),
+) -> None:
+    """批准任务: USER_REVIEW → MERGED → ARCHIVED (自动合并)."""
     board = _board()
     try:
         task = board.get_task(task_id)
-        PhaseGuard.enforce(task, TaskStatus.ARCHIVED)
+        if task.status != TaskStatus.USER_REVIEW:
+            _fail(f"任务状态为 {task.status.value}, 只有 USER_REVIEW 状态可以批准")
+
+        # 先合并到主干
+        if merge and task.worktree_path:
+            try:
+                wm = WorktreeManager(board.data.repo_path, board.data.main_branch)
+                merge_msg = wm.merge_worktree(task)
+                console.print(f"[green]✅ {merge_msg}[/green]")
+            except WorktreeError as e:
+                console.print(f"[yellow]⚠️ 合并失败: {e}, 继续归档[/yellow]")
+
+        board.transition(task_id, TaskStatus.MERGED)
         board.transition(task_id, TaskStatus.ARCHIVED)
-        console.print(f"[green]✅ 任务已批准归档[/green]: {task.id}")
-    except (BoardError, GuardError) as e:
+        console.print(f"[green]✅ 任务已批准并归档[/green]: {task.id}")
+    except BoardError as e:
         _fail(str(e))
 
 
 @task_app.command(name="reject")
-def task_reject(task_id: str = typer.Argument(help="任务ID")) -> None:
-    """拒绝任务: USER_REVIEW → PLANNING."""
+def task_reject(
+    task_id: str = typer.Argument(help="任务ID"),
+    feedback: str = typer.Option("", "--feedback", "-f", help="拒绝反馈"),
+) -> None:
+    """拒绝任务: USER_REVIEW → PLANNING (带反馈)."""
     board = _board()
     try:
         task = board.get_task(task_id)
         board.transition(task_id, TaskStatus.PLANNING)
-        console.print(f"[yellow]⚠️ 任务已拒绝, 回到规划阶段[/yellow]: {task.id}")
+        if feedback:
+            console.print(f"[yellow]⚠️ 任务已拒绝, 回到规划阶段[/yellow]: {task.id}")
+            console.print(f"[dim]反馈: {feedback}[/dim]")
+        else:
+            console.print(f"[yellow]⚠️ 任务已拒绝, 回到规划阶段[/yellow]: {task.id}")
     except BoardError as e:
         _fail(str(e))
 
@@ -306,6 +328,19 @@ def git_cleanup(task_id: str = typer.Argument(help="任务ID")) -> None:
 
 
 # ── Agent 调度 ──
+
+@agent_app.command(name="detect")
+def agent_detect() -> None:
+    """检测本地可用的 Agent CLI."""
+    from .runner import AgentRunner
+    agents = AgentRunner.detect_available_agents()
+    if not agents:
+        console.print("[yellow]未检测到可用的 Agent CLI[/yellow]")
+        console.print("[dim]已支持: claude-code, opencode[/dim]")
+        return
+    for a in agents:
+        console.print(f"[green]✅ {a['name']}[/green]: {a['path']}")
+
 
 @agent_app.command(name="run")
 def agent_run(task_id: str = typer.Argument(help="任务ID")) -> None:
